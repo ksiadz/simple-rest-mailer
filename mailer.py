@@ -1,3 +1,4 @@
+import logging
 import sys
 import os
 from flask import Flask, jsonify, request
@@ -6,8 +7,6 @@ import smtplib
 import email
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-#from email.MIMEMultipart import MIMEMultipart
-#from email.MIMEText import MIMEText
 
 app = Flask(__name__)
 api = Api(app)
@@ -17,28 +16,26 @@ MSG = ""
 FROM = ""
 
 @app.route('/api/', methods=['POST'])
-def add_entry():
-    request_json     = request.get_json()
-    value1           = request_json.get('data')
-    print(value1)
-
+def print_request():
+    request_json = request.get_json()
+    # secret of app to verify from spam bots
+    if request_json.get("secret") == "xxx":
+        logging.info(request_json)
+        logging.info("correct secret key")
+        TO = request_json.get('email')
+        FROM = 'xxx@gmail.com' 
+        MSG = request_json.get('content')
+        SUBJECT = request_json.get('subject')
+        send(TO, FROM, MSG, SUBJECT) 
+    else: 
+        logging.warning("wrong secret key")
     return jsonify(request_json)
 
-@app.route('/test/', methods=['POST'])
-def add_test():
-    request_json = request.get_json()
-    TO = request_json.get('to')
-    FROM = request_json.get('sender')
-    MSG = request_json.get('msg')
-    send(TO, FROM, MSG) 
-    return jsonify(TO, FROM, MSG, request_json)
-
-def send(TO, FROM, MSG):
-    # Send the email
+def send(TO, FROM, MSG, SUBJECT):
     msg = MIMEMultipart()
     msg['From'] = FROM
     msg['To'] = TO
-    msg['Subject'] = 'Order from ' + FROM
+    msg['Subject'] = SUBJECT
     body = MSG
     msg.attach(MIMEText(body, 'plain'))
     text = msg.as_string()
@@ -50,20 +47,16 @@ def send(TO, FROM, MSG):
             s.ehlo()
             s.starttls()
             s.ehlo()
-            s.login("###", "###")
-            s.sendmail("###", TO, text)
+            # https://myaccount.google.com/apppasswords
+            s.login("xxx@gmail.com", "gmailSecretAppKey")
+            s.sendmail("xxx@gmail.com", TO, text)
             s.close()
-        print("Email sent!")
+        logging.info("Email sent!")
     except:
-        print("Unable to send the email. Error: ", sys.exc_info()[0])
-        raise    
-    msg = MIMEMultipart()
-    msg['From'] = FROM
-    msg['To'] = TO
-    msg['Subject'] = 'Order from ' + FROM
-    body = MSG
-    msg.attach(MIMEText(body, 'plain'))
-    text = msg.as_string()
+        logging.warning("Unable to send the email. Error: ", sys.exc_info()[0])
+        raise       
 
 if __name__ == '__main__':
+    logging.basicConfig(filename='mailer.log',level=logging.DEBUG)
     app.run(host='0.0.0.0', debug=False)
+    
